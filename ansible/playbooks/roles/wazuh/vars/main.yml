@@ -1,6 +1,6 @@
 ---
 # Variables for the certs role
-ansible_user: mleo691
+ansible_user: amineaa024
 
 wazuh_cert_dir: /home/{{ ansible_user }}/config/wazuh_indexer_ssl_certs
 wazuh_config_dir: /home/{{ ansible_user }}/config/wazuh_config
