@@ -1,0 +1,212 @@
+version: "3.9"
+
+services:
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.12.0
+    ports:
+      - "0.0.0.0:1514:1514"
+      - "0.0.0.0:1515:1515"
+      - "0.0.0.0:55000:55000"
+    networks:
+      wazuh-overlay:
+        aliases:
+        - wazuh.manager
+    secrets:
+      - source: root-ca.pem
+        target: /etc/ssl/root-ca.pem
+        uid: "999"
+        gid: "999"
+        mode: 0400
+      - source: wazuh.manager.pem
+        target: /etc/ssl/filebeat.pem
+        uid: "999"
+        gid: "999"
+        mode: 0400
+      - source: wazuh.manager-key.pem
+        target: /etc/ssl/filebeat.key
+        uid: "999"
+        gid: "999"
+        mode: 0400
+    environment:
+      - INDEXER_URL=https://{{ wazuh_indexer_ip }}:9200
+      - INDEXER_USERNAME={{ wazuh_indexer_username }}
+      - INDEXER_PASSWORD={{ wazuh_indexer_password }}
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat.key
+      - API_USERNAME={{ wazuh_manager_username }}
+      - API_PASSWORD={{ wazuh_manager_password }}
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+      - filebeat_etc:/etc/filebeat
+      - filebeat_var:/var/lib/filebeat
+      - "{{ wazuh_config_dir }}/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf"
+      - "{{ wazuh_config_dir }}/wazuh-template.json:/etc/filebeat/wazuh-template.json"
+      - "{{ wazuh_config_dir }}/filebeat.yml:/etc/filebeat/filebeat.yml"
+    depends_on:
+      - wazuh-indexer
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.12.0
+    hostname: wazuh.indexer
+    restart: always
+    ports:
+      - "0.0.0.0:9200:9200"
+    networks:
+      wazuh-overlay:
+        aliases:
+        - wazuh.indexer
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - "{{ wazuh_config_dir }}/wazuh.indexer.yml:/usr/share/wazuh-indexer/opensearch.yml"
+      - wazuh-indexer-data:/var/lib/wazuh-indexer
+    secrets:
+      - source: root-ca.pem
+        target: /usr/share/wazuh-indexer/certs/root-ca.pem
+        uid: "1000"
+        gid: "1000"
+        mode: 0400
+      - source: wazuh.indexer.pem
+        target: /usr/share/wazuh-indexer/certs/wazuh.indexer.pem
+        uid: "1000"
+        gid: "1000"
+        mode: 0444
+      - source: wazuh.indexer-key.pem
+        target: /usr/share/wazuh-indexer/certs/wazuh.indexer.key
+        uid: "1000"
+        gid: "1000"
+        mode: 0400
+      - source: admin.pem
+        target: /usr/share/wazuh-indexer/certs/admin.pem
+        uid: "1000"
+        gid: "1000"
+        mode: 0444
+      - source: admin-key.pem
+        target: /usr/share/wazuh-indexer/certs/admin-key.pem
+        uid: "1000"
+        gid: "1000"
+        mode: 0400
+      
+
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.12.0
+    networks:
+      wazuh-overlay:
+        aliases:
+        - wazuh.dashboard
+      # traefik-public:
+    ports:
+      - "0.0.0.0:443:5601"
+    volumes:
+      - "{{ wazuh_config_dir }}/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml"
+      - "{{ wazuh_config_dir }}/wazuh.yml:/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
+      - wazuh-dashboard-config:/usr/share/wazuh-dashboard/data/wazuh/config
+      - wazuh-dashboard-custom:/usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom
+    secrets:
+      - source: root-ca.pem
+        target: /usr/share/wazuh-dashboard/certs/root-ca.pem
+        uid: "1000"
+        gid: "1000"
+        mode: 0400
+      - source: wazuh.dashboard.pem
+        target: /usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
+        uid: "1000"
+        gid: "1000"
+        mode: 0400
+      - source: wazuh.dashboard-key.pem
+        target: /usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem
+        uid: "1000"
+        gid: "1000"
+        mode: 0400
+    environment:
+      - INDEXER_USERNAME={{ wazuh_indexer_username }}
+      - INDEXER_PASSWORD={{ wazuh_indexer_password }}
+      - WAZUH_API_URL=https://{{ wazuh_manager_ip }}
+      - DASHBOARD_USERNAME={{ wazuh_dashboard_username }}
+      - DASHBOARD_PASSWORD={{ wazuh_dashboard_password }}
+      - API_USERNAME={{ wazuh_manager_username }}
+      - API_PASSWORD={{ wazuh_manager_password }}
+    links:
+      - wazuh.indexer:wazuh.indexer
+      - wazuh.manager:wazuh.manager
+    depends_on:
+      - wazuh-indexer
+      - wazuh-manager
+    deploy:
+      replicas: 1
+      # labels:
+      #   - "traefik.enable=true"
+      #   - "traefik.http.routers.wazuh.rule=Host(`{{ wazuh_dashboard_subdomain | default('wazuh') }}.{{ traefik_domain | default('soc.local') }}`)"
+      #   - "traefik.http.routers.wazuh.entrypoints=websecure"
+      #   - "traefik.http.routers.wazuh.tls.certresolver={{ 'letsencrypt' if not letsencrypt_staging else 'letsencrypt-staging' }}"
+      #   - "traefik.http.routers.wazuh.middlewares=default-headers@file,secure-headers@file"
+      #   - "traefik.http.services.wazuh.loadbalancer.server.port=5601"
+      #   - "traefik.docker.network=traefik-public"
+
+secrets:
+  admin.pem:
+    external: true
+  admin-key.pem:
+    external: true
+  root-ca.pem:
+    external: true
+  wazuh.manager.pem:
+    external: true
+  wazuh.manager-key.pem:
+    external: true
+  wazuh.indexer.pem:
+    external: true
+  wazuh.indexer-key.pem:
+    external: true
+  wazuh.dashboard.pem:
+    external: true
+  wazuh.dashboard-key.pem:
+    external: true
+
+volumes:
+  wazuh-indexer-data:
+  wazuh-indexer-logs:
+  wazuh-dashboard-config:
+  wazuh-dashboard-custom:
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agentless:
+  wazuh_wodles:
+  filebeat_etc:
+  filebeat_var:
+
+
+networks:
+  wazuh-overlay:
+    driver: overlay
+    driver_opts:
+      encrypted: "true"
+    attachable: true
+  traefik-public:
+    external: true

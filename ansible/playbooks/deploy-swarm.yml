@@ -1,0 +1,8 @@
+---
+- name: Setup Docker Swarm and deploy stack
+  hosts: swarm
+  become: true
+
+  roles:
+   # - swarm
+    - wazuh

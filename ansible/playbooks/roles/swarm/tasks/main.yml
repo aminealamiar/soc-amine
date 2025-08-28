@@ -1,0 +1,39 @@
+---
+- name: Install dependencies
+  ansible.builtin.apt:
+    name: ["apt-transport-https", "ca-certificates", "curl", "software-properties-common"]
+    state: present
+    update_cache: true
+
+- name: Add Docker GPG key
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  ansible.builtin.apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+    state: present
+
+- name: Install Docker
+  ansible.builtin.apt:
+    name: ["docker-ce", "docker-ce-cli", "containerd.io"]
+    state: present
+    update_cache: true
+
+- name: Add ansible user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+
+- name: Check if Swarm is already initialized
+  ansible.builtin.command: docker info --format '{{ "{{" }}.Swarm.LocalNodeState{{ "}}" }}'
+  register: swarm_status
+  changed_when: false
+  ignore_errors: true
+
+- name: Init Swarm
+  ansible.builtin.command: docker swarm init --advertise-addr {{ ansible_host }}
+  register: swarm_init
+  when: swarm_status.stdout != "active"
