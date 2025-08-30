@@ -59,7 +59,7 @@ jobs:
 
       - name: Run Selenium tests
         run: |
-          python tests/test_wazuh_dashboard.py
+          python3 tests/test_wazuh_dashboard.py
 
   deploy:
     needs: scan
