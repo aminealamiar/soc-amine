@@ -34,15 +34,15 @@ jobs:
 
       - name: Scan indexer image
         run: |
-          sudo trivy image wazuh-indexer-custom:4.12.0 --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 
+          trivy image wazuh-indexer-custom:4.12.0 --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 
 
       - name: Scan manager image
         run: |
-          sudo trivy image wazuh-manager-custom:4.12.0 --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 
+          trivy image wazuh-manager-custom:4.12.0 --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 
       
       - name: Scan dashboard image
         run: |
-          sudo trivy image wazuh-dashboard-custom:4.12.0 --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1  
+          trivy image wazuh-dashboard-custom:4.12.0 --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1  
 
   deploy:
     needs: scan
