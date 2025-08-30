@@ -49,6 +49,17 @@ jobs:
           docker save wazuh-dashboard-custom:4.12.0 -o dashboard.tar
           trivy image --input dashboard.tar --ignore-unfixed --severity HIGH,CRITICAL || true
           rm dashboard.tar
+  
+  test:
+    needs: scan
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Selenium tests
+        run: |
+          python tests/test_wazuh_dashboard.py
 
   deploy:
     needs: scan
